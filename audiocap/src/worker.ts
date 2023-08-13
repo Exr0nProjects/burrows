@@ -8,9 +8,6 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-import { Configuration, OpenAIApi } from "openai";
-import fetchAdapter from "@haverstack/axios-fetch-adapter";
-
 export interface Env {
 	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
 	// MY_KV_NAMESPACE: KVNamespace;
@@ -29,33 +26,7 @@ export interface Env {
 }
 
 export default {
-	async email(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext): Promise<Response> {
-		let buf = ""; for await (let chunk of message.raw) buf += chunk;
-
-		const configuration = new Configuration({
-			apiKey: env.OPENAI_API_KEY,
-			baseOptions: {
-				adapter: fetchAdapter
-			}
-		});
-		const openai = new OpenAIApi(configuration);
-		try {
-			const chatCompletion = await openai.createChatCompletion({
-			  model: "gpt-3.5-turbo-0613",
-			  messages: [{role: "user", content: "What's happening in the NBA today?"}],
-			  functions: [ ]
-			});
-
-			const msg = chatCompletion.data.choices[0].message!;
-			console.log(msg.function_call)
-
-			return new Response('Hello World!');
-		  } catch (e: any) {
-			return new Response(e);
-		  }
-	},
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-
 		return new Response('Hello World!');
 	},
 };
