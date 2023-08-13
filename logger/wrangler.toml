@@ -1,4 +1,4 @@
-name = "audiocap"
+name = "logger"
 main = "src/worker.ts"
 compatibility_date = "2023-08-07"
 
@@ -33,9 +33,9 @@ compatibility_date = "2023-08-07"
 
 # Bind another Worker service. Use this binding to call another Worker without network overhead.
 # Docs: https://developers.cloudflare.com/workers/platform/services
-services = [
-  { binding = "LOGGER", service = "logger" }
-]
+# [[services]]
+# binding = "MY_SERVICE"
+# service = "/api/*"
 
 # Bind a Durable Object. Durable objects are a scale-to-zero compute primitive based on the actor model.
 # Durable Objects can live for as long as needed. Use these when you need a long-running "server", such as in realtime apps.
