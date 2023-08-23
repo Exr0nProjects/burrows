@@ -11,6 +11,7 @@ import { Configuration, OpenAIApi } from "openai";
 import fetchAdapter from "@haverstack/axios-fetch-adapter";
 
 export interface Env {
+    OPENAI_API_KEY: string,
     // Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
     // MY_KV_NAMESPACE: KVNamespace;
     //
@@ -27,57 +28,90 @@ export interface Env {
     // MY_QUEUE: Queue;
 }
 
+const project_names = ['Gamut', 'Suyan', 'Valuenex', 'Wavetable', 'Burrows', 'USACO']
+
+const postprocessing_prompt = `
+You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription.
+Ensure the names of the following projects are spelled correctly: ${project_names.join(', ')}.
+Remove redundant statements. Organize points into paragraphs that are thematically and logically connected. Above all, capture all information provided and use only the context provided.
+`
+
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const formData = new FormData();
-        const blob = await request.blob();
-        formData.append('file', blob);
-        formData.append('model', 'whisper-1');
+        const req_formdata = await request.formData();
+
+        const keys = [ 'location', 'loc-long', 'loc-lat', 'loc-alt' ]
+        const req_metadata = Object.fromEntries(keys.map(k => [k, req_formdata.get(k)]))
+
+        const transcription_fd = new FormData();
+        const audio_file = (req_formdata.get('file')! as unknown as File);
+        const audio_as_blob = new Blob([audio_file], { type: audio_file.type });
+        transcription_fd.append('file', audio_as_blob);
+        transcription_fd.append('model', 'whisper-1');
 
         const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
             },
-            body: formData
+            body: transcription_fd
         })
+        // optm: give it a list of names or toggl project names?
+        const transcript_res: string = (await whisperResponse.json() as { text: string }).text;
 
-        // Parse the response
-        const data = await whisperResponse.json()
-        console.log("response", data)
 
-        const res = {
-            input_stats: {
-                filesize_kb: blob.size/1024,
-            },
-            response: {
-                data
+
+
+        const configuration = new Configuration({
+            apiKey: env.OPENAI_API_KEY,
+            baseOptions: {
+                adapter: fetchAdapter
             }
-        }
+        });
+        const openai = new OpenAIApi(configuration);
+        const completion = await openai.createChatCompletion({
+            // messages: [{ role: "system", content: "please say hello" }],
+            messages: [
+                { role: "system", content: postprocessing_prompt },
+                { role: "user", content: transcript_res }
+            ],
+            model: "gpt-3.5-turbo",
+        });
+
+        const msg = completion.data
+
+
+
+
+        // const openai = new OpenAIApi(configuration);
+        // const chatCompletion = await openai.createChatCompletion({
+        //     model: "gpt-3.5-turbo-0613",
+        //     messages: [
+        //         // { role: "system", content: postprocessing_prompt },
+        //         // { role: "user", content: transcript_res }
+        //         { role: "user", content: "whats up with charles dickenson?" }
+        //     ],
+        //     functions: [ ]
+        // });
+
+        // const msg = chatCompletion.data.choices[0].message!;
+        // const msg = 'hi'
+
+
+
+
+
+
 
         // Return the response
+        const res = {
+            input_stats: {
+                filesize_kb: audio_as_blob.size/1024,
+                metadata: req_metadata,
+            },
+            raw_transcript: transcript_res,
+            postprocess_msg: msg
+        }
         return new Response(JSON.stringify(res, null, 4), { status: 200 })
-
-        // const configuration = new Configuration({
-        //     apiKey: env.OPENAI_API_KEY,
-        //     baseOptions: {
-        //         adapter: fetchAdapter
-        //     }
-        // });
-        // const openai = new OpenAIApi(configuration);
-        // try {
-        //     const chatCompletion = await openai.createChatCompletion({
-        //         model: "gpt-3.5-turbo-0613",
-        //         messages: [{role: "user", content: "What's happening in the NBA today?"}],
-        //         functions: [ ]
-        //     });
-
-        //     const msg = chatCompletion.data.choices[0].message!;
-        //     console.log(msg.function_call)
-
-        //     return new Response('Hello World!');
-        // } catch (e: any) {
-        //     return new Response(e);
-        // }
     },
 };
