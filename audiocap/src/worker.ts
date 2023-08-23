@@ -34,10 +34,10 @@ const postprocessing_prompt = `
 You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription. Use these steps:
 
 STEP 1 - cleaning:
-Correct transcription mistakes by ensuring the names of the following projects are spelled correctly: ${project_names.join(', ')}.  Remove filler words.
+Correct transcription mistakes by ensuring the names of the following projects are spelled correctly: ${project_names.join(', ')}. Remove filler words.
 
 STEP 2 - organizing:
-Convert the transcript to bullet point form, exactly preserving the structure and voice of the original speaker. Always quote the transcript exactly. Keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
+Make a bullet list of quotes from the transcript, exactly preserving the structure and voice of the original speaker. Always quote the transcript exactly. Keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
 `
 //optm: Replace partial thoughts with their completed successors.?
 
@@ -55,6 +55,7 @@ export default {
             const audio_as_blob = new Blob([audio_file], { type: audio_file.type });
             transcription_fd.append('file', audio_as_blob);
             transcription_fd.append('model', 'whisper-1');
+            transcription_fd.append('prompt', '[PAUSE] ');
 
             const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                 method: 'POST',
