@@ -33,7 +33,7 @@ const project_names = ['Gamut', 'Suyan', 'Valuenex', 'Wavetable', 'Burrows', 'US
 const postprocessing_prompt = `
 You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription.
 Ensure the names of the following projects are spelled correctly: ${project_names.join(', ')}.
-Organize the transcript into bullet points with nested structure. Indent subpoints under headers and topic descriptions. Copy the language used in the transcript exactly. Above all, capture all information provided and use only the context provided.
+Break the transcript into bullet points, exactly preserving the structure and wording. Remove redundancy and filler words, but keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
 `
 
 export default {
