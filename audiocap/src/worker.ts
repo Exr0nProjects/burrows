@@ -29,16 +29,35 @@ export interface Env {
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        env.LOGGER.fetch('https://logger.spotyie.workers.dev', {
+        const formData = new FormData();
+        const blob = await request.blob();
+        formData.append('file', blob);
+        formData.append('model', 'whisper-1');
+
+        const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
-            body: "woof"
-        });
-        request.arrayBuffer().then(buf => {
-            fetch('https://logger.spotyie.workers.dev', {
-                method: 'POST',
-                body: "audiofile promise ressed"
-            });
-        });
+            headers: {
+              'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+            },
+            body: formData
+        })
+
+        // Parse the response
+        const data = await whisperResponse.json()
+        console.log("response", data)
+
+        const res = {
+            input_stats: {
+                filesize_kb: blob.size/1024,
+            },
+            response: {
+                data
+            }
+        }
+
+        // Return the response
+        return new Response(JSON.stringify(res, null, 4), { status: 200 })
+
         // const configuration = new Configuration({
         //     apiKey: env.OPENAI_API_KEY,
         //     baseOptions: {
@@ -60,6 +79,5 @@ export default {
         // } catch (e: any) {
         //     return new Response(e);
         // }
-        return new Response('Hello World!');
     },
 };
