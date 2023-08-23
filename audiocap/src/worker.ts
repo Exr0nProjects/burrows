@@ -28,13 +28,18 @@ export interface Env {
     // MY_QUEUE: Queue;
 }
 
-const project_names = ['Gamut', 'Suyan', 'Valuenex', 'Wavetable', 'Burrows', 'USACO']
+const project_names = ['Gamut', 'Suyan', 'Valuenex', 'Wavetable', 'Burrows', 'USACO', 'X-camp']
 
 const postprocessing_prompt = `
-You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription.
-Ensure the names of the following projects are spelled correctly: ${project_names.join(', ')}.
-Break the transcript into bullet points, exactly preserving the structure and voice of the original speaker. Use exact quotes from the transcript only. Remove redundancy and filler words, but keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
+You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription. Use these steps:
+
+STEP 1 - cleaning:
+Correct transcription mistakes by ensuring the names of the following projects are spelled correctly: ${project_names.join(', ')}.  Remove filler words.
+
+STEP 2 - organizing:
+Convert the transcript to bullet point form, exactly preserving the structure and voice of the original speaker. Always quote the transcript exactly. Keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
 `
+//optm: Replace partial thoughts with their completed successors.?
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -58,6 +63,7 @@ export default {
                 },
                 body: transcription_fd
             })
+            // optm: give it pause tags to have it try to output pause tags?
             // optm: give it a list of names or toggl project names?
             return [ (await whisperResponse.json() as { text: string }).text, audio_as_blob.size ]
         })();
