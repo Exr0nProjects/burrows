@@ -92,6 +92,9 @@ export default {
         })();
 
 
+//        https://stackoverflow.com/a/74465567
+// https://blog.cloudflare.com/sending-email-from-workers-with-mailchannels/
+
         // Return the response
         const res = {
             input_stats: {
