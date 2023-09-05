@@ -30,6 +30,16 @@ export interface Env {
 
 const project_names = ['Gamut', 'Suyan', 'Valuenex', 'Wavetable', 'Burrows', 'USACO', 'X-camp']
 
+// const postprocessing_prompt = `
+// You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription. Use these steps:
+
+// STEP 1 - cleaning:
+// Correct transcription mistakes by ensuring the names of the following projects are spelled correctly: ${project_names.join(', ')}. Remove filler words.
+
+// STEP 2 - organizing:
+// Make a bullet list of quotes from the transcript, exactly preserving the structure and voice of the original speaker. Always quote the transcript exactly. Keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
+// `
+
 const postprocessing_prompt = `
 You are a helpful assistant tasked with correcting mistakes in, removing filler words from, and organizing a transcription. Use these steps:
 
@@ -38,7 +48,26 @@ Correct transcription mistakes by ensuring the names of the following projects a
 
 STEP 2 - organizing:
 Make a bullet list of quotes from the transcript, exactly preserving the structure and voice of the original speaker. Always quote the transcript exactly. Keep all reflections, opinions, and feelings. Indent subpoints under headers and topic descriptions. Above all, capture all comments and emotions provided and use only the context provided.
-`
+
+Here is an example of the format you must follow:
+
+EXAMPLE INPUT:
+You are um, you're an agent that, like. An agent that transcribes audio. Because audio is, like, good at capturing, and whisper, um, and it turns out to be cheap.
+
+EXAMPLE OUTPUT:
+---
+STEP 1:
+You're an agent that transcribes audio. Because audio is good at capturing, and whisper turns out to be cheap.
+---
+STEP 2:
+- "You're an agent that transcribes audio."
+    - "Becuase audio is good at capturing,"
+    - "and whisper turns out to be cheap."
+---
+`, parser = /(?:---\nSTEP 2:\n((?:.|\s)+)\n---)/
+
+
+
 //optm: Replace partial thoughts with their completed successors.?
 
 export default {
@@ -91,18 +120,31 @@ export default {
             return completion.data;
         })();
 
+        // const postprocess_parsed = postprocess_res.choices[0].message?.content?.match(parser)?.[1]
+        const postprocess_parsed: string | null = (() => {
+            const SEARCH_FOR = '---\nSTEP 2:\n';
+            let msg = postprocess_res.choices[0].message?.content?.trim()
+            if (msg === undefined) return null;
+            if (msg?.endsWith('---')) msg = msg.slice(0, -3)
+            const beg_idx = msg?.indexOf(SEARCH_FOR);
+            if (beg_idx !== undefined && beg_idx > 0) return msg?.slice(beg_idx + SEARCH_FOR.length)
+            return null;
+        })();
 
+        // do filler word and repetition removal w/ linguistics?
+        // don't use regex
 //        https://stackoverflow.com/a/74465567
 // https://blog.cloudflare.com/sending-email-from-workers-with-mailchannels/
 
         // Return the response
         const res = {
+            final_answer: postprocess_parsed,
             input_stats: {
-                filesize_kb: audio_filesize/1024,
+                filesize_mb: audio_filesize/1024/1024,
                 metadata: req_metadata,
             },
             raw_transcript: transcript_res,
-            postprocess_msg: postprocess_res
+            postprocess_msg: postprocess_res,
         }
         return new Response(JSON.stringify(res, null, 4), { status: 200 })
     },
