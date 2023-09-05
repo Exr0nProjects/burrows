@@ -61,91 +61,134 @@ You're an agent that transcribes audio. Because audio is good at capturing, and 
 ---
 STEP 2:
 - "You're an agent that transcribes audio."
-    - "Becuase audio is good at capturing,"
-    - "and whisper turns out to be cheap."
+- "Becuase audio is good at capturing,"
+- "and whisper turns out to be cheap."
 ---
 `, parser = /(?:---\nSTEP 2:\n((?:.|\s)+)\n---)/
 
+async function main(audio_file: File, req_metadata: any, env: Env) {
+    // transcribe audio
+    const [ transcript_res, audio_filesize ] = await (async () => {
+        const transcription_fd = new FormData();
+        const audio_as_blob = new Blob([audio_file], { type: audio_file.type });
+        transcription_fd.append('file', audio_as_blob);
+        transcription_fd.append('model', 'whisper-1');
+        transcription_fd.append('prompt', '[PAUSE] ');
 
+        const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+            },
+            body: transcription_fd
+        })
+        // optm: give it pause tags to have it try to output pause tags?
+        // optm: give it a list of names or toggl project names?
+        return [ (await whisperResponse.json() as { text: string }).text, audio_as_blob.size ]
+    })();
+
+
+    // organize transcript
+    const postprocess_res = await ( async() => {
+        const configuration = new Configuration({
+            apiKey: env.OPENAI_API_KEY,
+            baseOptions: {
+                adapter: fetchAdapter
+            }
+        });
+        const openai = new OpenAIApi(configuration);
+        const completion = await openai.createChatCompletion({
+            // messages: [{ role: "system", content: "please say hello" }],
+            messages: [
+                { role: "system", content: postprocessing_prompt },
+                { role: "user", content: transcript_res }
+            ],
+            model: "gpt-3.5-turbo",
+            temperature: 0,
+        });
+        return completion.data;
+    })();
+
+    // parse the llm output
+    // const postprocess_parsed = postprocess_res.choices[0].message?.content?.match(parser)?.[1]
+    const postprocess_parsed: string | null = (() => {
+        const SEARCH_FOR = '---\nSTEP 2:\n';
+        let msg = postprocess_res.choices[0].message?.content?.trim()
+        if (msg === undefined) return null;
+        if (msg?.endsWith('---')) msg = msg.slice(0, -3)
+        const beg_idx = msg?.indexOf(SEARCH_FOR);
+        if (beg_idx !== undefined && beg_idx > 0) return msg?.slice(beg_idx + SEARCH_FOR.length)
+        return null;
+    })();
+
+    const res = {
+        final_answer: postprocess_parsed,
+        input_stats: {
+            filesize_mb: audio_filesize/1024/1024,
+            metadata: req_metadata,
+        },
+        raw_transcript: transcript_res,
+        postprocess_msg: postprocess_res,
+    }
+    return res;
+}
+
+async function sendEmail(destination_email: string, content_md: string) {
+    // to set this up, you must create an spf 'record' on ur domain and a TXT record for mailchannels auth (https://support.mailchannels.com/hc/en-us/articles/16918954360845)
+    return await fetch(new Request('https://api.mailchannels.net/tx/v1/send', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            personalizations: [
+                {
+                    to: [{ email: destination_email, name: 'Audiocap Burrows Inbox'}],
+                },
+            ],
+            from: {
+                email: 'noreply-audiocap@exr0n.com',
+                name: 'Burrows Audiocap',
+            },
+            subject: 'Burrows Audiocap Transcript',
+            content: [  // todo: render as markdown. but probs exceeds 10ms
+                {
+                    type: 'text/plain',
+                    value: content_md,
+                },
+            ],
+        }),
+    }));
+}
 
 //optm: Replace partial thoughts with their completed successors.?
+// todo: do filler word and repetition removal w/ linguistics?
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        if( request.method !== "POST" ) return new Response('Hi there!');
 
         const req_formdata = await request.formData();
         const keys = [ 'location', 'loc-long', 'loc-lat', 'loc-alt' ]
         const req_metadata = Object.fromEntries(keys.map(k => [k, req_formdata.get(k)]))
+        const audio_file = (req_formdata.get('file')! as unknown as File);
 
-        // transcribe audio
-        const [ transcript_res, audio_filesize ] = await (async () => {
-            const transcription_fd = new FormData();
-            const audio_file = (req_formdata.get('file')! as unknown as File);
-            const audio_as_blob = new Blob([audio_file], { type: audio_file.type });
-            transcription_fd.append('file', audio_as_blob);
-            transcription_fd.append('model', 'whisper-1');
-            transcription_fd.append('prompt', '[PAUSE] ');
+        const start_time = Date.now()
 
-            const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                method: 'POST',
-                headers: {
-                'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-                },
-                body: transcription_fd
-            })
-            // optm: give it pause tags to have it try to output pause tags?
-            // optm: give it a list of names or toggl project names?
-            return [ (await whisperResponse.json() as { text: string }).text, audio_as_blob.size ]
-        })();
-
-
-        // organize transcript
-        const postprocess_res = await ( async() => {
-            const configuration = new Configuration({
-                apiKey: env.OPENAI_API_KEY,
-                baseOptions: {
-                    adapter: fetchAdapter
-                }
-            });
-            const openai = new OpenAIApi(configuration);
-            const completion = await openai.createChatCompletion({
-                // messages: [{ role: "system", content: "please say hello" }],
-                messages: [
-                    { role: "system", content: postprocessing_prompt },
-                    { role: "user", content: transcript_res }
-                ],
-                model: "gpt-3.5-turbo",
-                temperature: 0,
-            });
-            return completion.data;
-        })();
-
-        // const postprocess_parsed = postprocess_res.choices[0].message?.content?.match(parser)?.[1]
-        const postprocess_parsed: string | null = (() => {
-            const SEARCH_FOR = '---\nSTEP 2:\n';
-            let msg = postprocess_res.choices[0].message?.content?.trim()
-            if (msg === undefined) return null;
-            if (msg?.endsWith('---')) msg = msg.slice(0, -3)
-            const beg_idx = msg?.indexOf(SEARCH_FOR);
-            if (beg_idx !== undefined && beg_idx > 0) return msg?.slice(beg_idx + SEARCH_FOR.length)
-            return null;
-        })();
-
-        // do filler word and repetition removal w/ linguistics?
-        // don't use regex
-//        https://stackoverflow.com/a/74465567
-// https://blog.cloudflare.com/sending-email-from-workers-with-mailchannels/
-
-        // Return the response
-        const res = {
-            final_answer: postprocess_parsed,
-            input_stats: {
-                filesize_mb: audio_filesize/1024/1024,
-                metadata: req_metadata,
-            },
-            raw_transcript: transcript_res,
-            postprocess_msg: postprocess_res,
+        // send email to destination if it's provided
+        const destination_email = req_formdata.get('destination_email');
+        if (destination_email !== null) {
+            ctx.waitUntil((async () => {
+                const res = await main(audio_file, req_metadata, env);
+                const backup = res.postprocess_msg.choices[0].message?.content ?? res.raw_transcript
+                const got = await sendEmail(destination_email, res.final_answer ?? backup);
+                console.log('full email sent successfully', (Date.now()-start_time)/1000)
+                console.log(await got.text(), got.statusText);
+            })());
+            return new Response("Please expect an email shortly.");
+        } else {
+            const res = await main(audio_file, req_metadata, env);
+            return new Response(JSON.stringify(res, null, 4), { status: 200 })
         }
-        return new Response(JSON.stringify(res, null, 4), { status: 200 })
     },
 };
