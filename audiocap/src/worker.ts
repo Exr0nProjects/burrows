@@ -175,9 +175,8 @@ export default {
 
         const start_time = Date.now()
 
-        // send email to destination if it's provided
         const destination_email = req_formdata.get('destination_email');
-        if (destination_email !== null) {
+        if (audio_file.size < Math.pow(1024, 2) && destination_email !== null) {  // short enough that we can probably return early
             ctx.waitUntil((async () => {
                 const res = await main(audio_file, req_metadata, env);
                 const backup = res.postprocess_msg.choices[0].message?.content ?? res.raw_transcript
@@ -186,9 +185,11 @@ export default {
                 console.log(await got.text(), got.statusText);
             })());
             return new Response("Please expect an email shortly.");
-        } else {
-            const res = await main(audio_file, req_metadata, env);
-            return new Response(JSON.stringify(res, null, 4), { status: 200 })
         }
+
+        console.log("long file detected. beginning processing...")
+        const res = await main(audio_file, req_metadata, env);
+        if (destination_email !== null) await sendEmail(destination_email, JSON.stringify(res, null, 4));
+        return new Response(JSON.stringify(res, null, 4), { status: 200 })
     },
 };
