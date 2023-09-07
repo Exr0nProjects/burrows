@@ -27,11 +27,18 @@ export interface Env {
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		let buf = '';
-		for await (let chunk of request.body!) {
-			chunk.forEach((c: number) => { buf += String.fromCharCode(c); });
-		}
-		console.log(buf)
+		console.log(request.method, request.url);
+
+		request.headers.forEach((v, k) => console.log(k, v))
+		// console.log(JSON.stringify(request.headers.entries(), x => x, 4));
+		console.log(JSON.stringify(request.json()))
+
+		// let buf = '';
+		// for await (let chunk of request.body!) {
+		// 	chunk.forEach((c: number) => { buf += String.fromCharCode(c); });
+		// }
+		// console.log(buf)
+
 		return new Response('OK');
 	},
 };
