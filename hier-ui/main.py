@@ -63,6 +63,8 @@ def annotate_image(img, ocr_data):
     > 5. a word.
     Looks like block detection is pretty good for headings, but it may split non-headings (esp. code / very varied line lengths into headings)
     very much struggles for UIs
+
+    i probably need to detect the main body and then re-run on just that
     """
     for i, (level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text) in ocr_data.iterrows():
         start_point =(left, top)
