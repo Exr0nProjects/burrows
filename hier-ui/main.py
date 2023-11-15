@@ -51,6 +51,20 @@ def print_lines(ocr_data):
         if (level == 5): rolling_linebuf.append(text.strip())
     print(' '.join(rolling_linebuf))
 
+
+def hex_to_rgb(hex_color: str):
+    hex_color = hex_color.strip()
+    if hex_color.startswith('#'): hex_color = hex_color[1:]
+    assert len(hex_color) == 6
+    return list(reversed([int(hex_color[i:i+2], base=16) for i in range(0, 5, 2)]))
+
+
+
+
+
+
+
+
 def annotate_image(img, ocr_data):
     annotated = img.copy()
 
@@ -66,12 +80,16 @@ def annotate_image(img, ocr_data):
 
     i probably need to detect the main body and then re-run on just that
     """
+    print(hex_to_rgb('#326ccc'))
     for i, (level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text) in ocr_data.iterrows():
         start_point =(left, top)
         end_point =(left + width, top + height)
 
         if level == 5:  # annotate words
             cv2.rectangle(annotated, start_point, end_point, (0, 0, 255), thickness=1, lineType=cv2.LINE_8)
+
+        if level == 4:  # annotate lines
+            cv2.rectangle(annotated, start_point, end_point, hex_to_rgb('#326ccc'), thickness=1, lineType=cv2.LINE_8)
 
         if level == 2:
             cv2.rectangle(annotated, start_point, end_point, (0, 200, 0), thickness=1, lineType=cv2.LINE_8)
