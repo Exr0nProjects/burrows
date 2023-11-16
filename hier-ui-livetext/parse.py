@@ -44,9 +44,17 @@ class Filters:
     @classmethod
     def away_from_border(cls, boxes: List[Box]):
         def is_border(box):
-            if box.p[3][0] > 0.95:
-                print(box.p[3][0])
-            return any(p[0] == 0 or p[1] == 0 or p[0] == 1 or p[1] == 1 for p in box.p)
+            thresh = 0.01   # within 1% of the edge
+            # only consider top left and bottom right
+            top = box.p[0][1]
+            bot = box.p[3][1]
+            lef = box.p[0][0]
+            rig = box.p[3][0]
+
+            if top < thresh or bot > 1-thresh: return True
+            if lef < thresh or rig > 1-thresh: return True
+            return False
+            # TODO: somehow check if it looks like a cut-off word.
         return np.array([is_border(b) for b in boxes])
 
 def main_annotate(img, boxes):
