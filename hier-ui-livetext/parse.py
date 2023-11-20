@@ -7,7 +7,7 @@ from rich import print
 from subprocess import run
 import numpy as np
 from operator import itemgetter as ig, attrgetter as ag, methodcaller as mc
-from functools import partial
+from functools import partial, cached_property
 
 from util import *
 
@@ -23,15 +23,56 @@ class Box:
     p: List[Tuple[float, float]]    # top left, top right, bottom left, bottom right
     t: str
     i: np.ndarray
+    im_dims: Tuple[int, int]
 
     @classmethod
     def from_pt(cls, img, p, t):
         (x1, y1), (x2, y2) = coordify(img, p[0]), coordify(img, p[3])
-        return Box(p, t, img[x1:x2, y1:y2])
+        return Box(p, t, img[x1:x2, y1:y2], img.shape[:2])
 
     @classmethod
     def from_corners(cls, img: np.ndarray, p1, p2, t):
         return Box.from_pt(img, [p1, (p2[0], p1[1]), (p1[0], p2[1]), p2], t)
+
+    @cached_property
+    def fg_bg_colors(self) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]]]:
+        """returns in BGR to match opencv"""
+        n_samples = max(self.w_px * self.h_px//10, 50)
+        rng = np.random.default_rng()
+        print(self.i, np.vstack(self.i).shape, 'cow')
+        sample = rng.choice(np.vstack(self.i), size=n_samples)  # TODO: from last time. was making a random-sample thing and then ig just histogram/counting sort to find the bg color and fg color? or could do max distance of unifrom color or smt, bc fonts are usually stroke-based while the area between is usually larger
+        fgs = []
+        bgs = []
+        return [], []
+
+    @property
+    def tl(self): return self.p[0]
+    @property
+    def tr(self): return self.p[1]
+    @property
+    def bl(self): return self.p[2]
+    @property
+    def br(self): return self.p[3]
+    @property
+    def x(self): return self.p[0][0]
+    @property
+    def y(self): return self.p[0][1]
+    @property
+    def w(self): return abs(self.br[0] - self.bl[0])
+    @property
+    def h(self): return abs(self.br[1] - self.bl[1])
+    @property
+    def x_px(self): return int(self.p[0][0] * self.im_w)
+    @property
+    def y_px(self): return int(self.p[0][1] * self.im_h)
+    @property
+    def w_px(self): return int(abs(self.br[0] - self.bl[0]) * self.im_w)
+    @property
+    def h_px(self): return int(abs(self.br[1] - self.bl[1]) * self.im_h)
+    @property
+    def im_w(self): return self.im_dims[0]
+    @property
+    def im_h(self): return self.im_dims[1]
 
 def read_img(path):
     return cv2.imread(path)
@@ -78,6 +119,7 @@ def draw_boxes(img, boxes, colors, labels=None):
     if type(labels) is str: labels = [labels] * len(boxes)
     else: assert len(labels) == len(boxes)
 
+    print(colors, type(colors))
     if type(colors) is str: colors = [colors] * len(boxes)
     else: assert len(colors) == len(boxes)
 
@@ -94,19 +136,23 @@ def draw_boxes(img, boxes, colors, labels=None):
 
         cv2.putText(img, f"{i}", cify(box.p[2]), font, 0.02 * abs(cify(box.p[0])[1] - cify(box.p[2])[1]), color, 3, lineType)
 
+        # print(box.fg_bg_colors)
+
+def filter_boxes_with(boxes, *filters, img: np.ndarray=None, color: str=None, label: str=None) -> List[Box]:
+    mask = np.all([f(boxes) for f in filters], axis=0)
+    masked_out = np.ma.array(boxes, mask=mask).compressed()
+    if img is not None:
+        if color is None: color = '#ff0000'
+        if label is None: label = 'masked out'
+        print(color, label)
+        draw_boxes(img, masked_out, color, label)
+    return np.ma.array(boxes, mask=~mask).compressed()
 
 def main_annotate(img, boxes):
     img = img.copy()
 
     #### pre filtering
-    filters = [
-        Filters.alignment_is_square,
-    ]
-    mask = np.all([f(boxes) for f in filters], axis=0)
-    not_aligned = np.ma.array(boxes, mask=mask).compressed()
-    draw_boxes(img, not_aligned, '#ff0000', 'misaligned')
-
-    boxes = np.ma.array(boxes, mask=~mask).compressed()
+    # filter_boxes_with(boxes, Filters.alignment_is_square)
 
 
     ### chunking into paragraphs
@@ -132,12 +178,10 @@ def main_annotate(img, boxes):
 
 
     ### remove things on the edge
-    mask = Filters.away_from_border(p_boxes)
-    edgy = np.ma.array(p_boxes, mask=mask).compressed()
-    draw_boxes(img, edgy, '#ff0000', 'edgy')
+    p_boxes = filter_boxes_with(p_boxes, Filters.away_from_border, img=img, label='edgy')
 
 
-    draw_boxes(img, boxes, '#007700', 'correct')
+    # draw_boxes(img, boxes, '#007700', 'correct')
 
     cv2.imshow('pictoor', img)
     cv2.waitKey(0)
