@@ -59,26 +59,28 @@ def warp_and_tessaract_correct(image, points: List[Tuple[int, int]]):
     # ax.imshow(warped)
     # for w in words:
     #     ax.add_patch(Rectangle((w.left, w.top), w.width, w.height, fill=False))
-
     # plt.show()
     # print(words)
 
-    if len(words) == 0: return warped, points, maxHeight * 0.8
+    if len(words) == 0: return warped, points, maxHeight * 0.7  # TODO: sometimes tessaract just fails
+
     avg_height = sum(w.height for w in words)/len(words)
 
-    x1 = min(w.left for w in words)
-    x2 = max(w.left + w.width for w in words)
-    y1 = min(w.top for w in words)
-    y2 = max(w.top + w.height for w in words)
+    x1 = int(min(w.left for w in words))
+    x2 = int(max(w.left + w.width for w in words))
+    y1 = int(min(w.top for w in words))
+    y2 = int(max(w.top + w.height for w in words))
 
-    tightened_img = warped[x1:x2, y1:y2]
+    # print(y1, y2, x1, x2)
+    tightened_img = warped[y1:y2, x1:x2]
 
 
     # transform tighter bounding box back into image space
-    M_inv = np.linalg.pinv(M)
-    packed_rectified_tightened_points = np.array([[(x1, y1), (x2, y1), (x1, y2), (x2, y2)]], dtype='float32')
-    og_space = cv2.perspectiveTransform(packed_rectified_tightened_points, M_inv)
+    # TODO: transform back isn't really working
+    # M_inv = np.linalg.pinv(M)
+    # packed_rectified_tightened_points = np.array([[(x1, y1), (x2, y1), (x1, y2), (x2, y2)]], dtype='float32')
+    # og_space = cv2.perspectiveTransform(packed_rectified_tightened_points, M_inv)
 
-    return tightened_img, og_space, avg_height
+    return tightened_img, points, avg_height
 
 

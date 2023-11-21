@@ -9,6 +9,7 @@ import numpy as np
 from operator import itemgetter as ig, attrgetter as ag, methodcaller as mc
 from functools import partial, cached_property
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 from util import *
 import perspective_kit
@@ -37,7 +38,7 @@ class Box:
         # return Box(p, t, im_slice_squarified, img.shape[:2], 0)
 
         tightened_img_rectified, tighter_coords, font_size = perspective_kit.warp_and_tessaract_correct(img, points)
-        return Box(tighter_coords, t, tightened_img_rectified, img.shape[:2], font_size)
+        return Box(p, t, tightened_img_rectified, img.shape[:2], font_size)
 
     @classmethod
     def from_corners(cls, img: np.ndarray, p1, p2, t):
@@ -54,15 +55,17 @@ class Box:
 
         # colors = [bgr_to_hex(pix) for pix in sample]
         # sample = np.apply_along_axis(bgr_to_hsv, 1, sample)
-        fig = plt.figure()
-        img_ax = fig.add_subplot(212)
-        img_ax.imshow(self.i)
-        img_ax.set_title(self.t)
+
+        # fig = plt.figure()
+        # img_ax = fig.add_subplot(212)
+        # img_ax.imshow(self.i)
+        # img_ax.set_title(self.t)
+
         # ax.scatter(*sample.T, c=colors)
         # ax.set_xlabel('v')
         # ax.set_ylabel('s')
         # ax.set_zlabel('h')
-        plt.show()
+        # plt.show()
         # print(sample)
 
         fgs = []
@@ -71,7 +74,7 @@ class Box:
 
     @cached_property
     def est_font_size(self) -> float:
-        return self.h
+        return self._font_size
 
     @property
     def tl(self): return self.p[0]
@@ -108,7 +111,7 @@ def read_img(path):
 def get_richText_points(path: str) -> List[Box]:
     out = run(["./alexchan.swift", path], capture_output=True)
     img = read_img(path)
-    return [Box.from_pt(img, **x) for x in loads(out.stdout)]
+    return [Box.from_pt(img, **x) for x in tqdm(loads(out.stdout))]
 
 class Filters:
     @classmethod
@@ -172,11 +175,14 @@ def filter_boxes_with(boxes, *filters, img: np.ndarray=None, color: str=None, la
         draw_boxes(img, masked_out, color, label)
     return np.ma.array(boxes, mask=~mask).compressed()
 
-def main_annotate(img, boxes):
+def main_annotate(img, boxes: List[Box]):
     img = img.copy()
 
     #### pre filtering
     # filter_boxes_with(boxes, Filters.alignment_is_square)
+
+    final_str = ''
+
 
 
     ### chunking into paragraphs
@@ -187,9 +193,36 @@ def main_annotate(img, boxes):
         if prev is None or prev.p[0][1] < box.p[3][1]:
             paragraphs.append([])
             para_texts.append("")
+            final_str += '\n'
+
+        if box.est_font_size > 60:
+            final_str += '# '
+        elif box.est_font_size > 30:
+            final_str += '## '
+        elif box.est_font_size > 15:
+            final_str += '### '
+        # elif box.est_font_size > 12:
+        #     final_str += '#### '
+        final_str += box.t
+        if not box.t.endswith('\n'): final_str += '\n'
+
         paragraphs[-1].append(box)
         para_texts[-1] += ' ' + box.t
         prev = box
+
+    print(final_str)
+
+    # show distribution of heights
+    fig, ax = plt.subplots()
+    ax.hist([b.est_font_size for b in boxes], bins=100)
+    plt.show()
+
+
+    draw_boxes(img, boxes, '#007700', 'correct')
+    cv2.imshow('pictoor', img)
+    cv2.waitKey(0)
+
+    return
 
     def calc_bounds(boxes):
         flatten = lambda ll: [x for y in ll for x in y]
@@ -220,8 +253,7 @@ def main():
 
     impath = argv[1]
     boxes = get_richText_points(impath)
-    for box in boxes:
-        print(box.fg_bg_colors)
+    # for box in boxes: print(box.fg_bg_colors)
     img = read_img(impath)
     main_annotate(img, boxes)
 
