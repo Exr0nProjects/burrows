@@ -9,9 +9,9 @@ import numpy as np
 from operator import itemgetter as ig, attrgetter as ag, methodcaller as mc
 from functools import partial, cached_property
 from matplotlib import pyplot as plt
-from macropy.quick_lambda import macros, f, _
 
 from util import *
+import perspective_kit
 
 import random
 
@@ -29,11 +29,10 @@ class Box:
 
     @classmethod
     def from_pt(cls, img, p, t):
-        (x1, y1), (x2, y2) = coordify(img, p[0]), coordify(img, p[3])
-        (x3, y3), (x4, y4) = coordify(img, p[0]), coordify(img, p[3])
-        x1, x2 = min(x1, x2, x3, x4), max(x1, x2, x3, x4)
-        y1, y2 = min(y1, y2, y3, y4), max(y1, y2, y3, y4)
-        return Box(p, t, img[y1:y2, x1:x2], img.shape[:2])
+        points = np.array([coordify(img, pt) for pt in p], dtype='float32')
+        im_slice_squarified = perspective_kit.four_point_transform(img, points)
+
+        return Box(p, t, im_slice_squarified, img.shape[:2])
 
     @classmethod
     def from_corners(cls, img: np.ndarray, p1, p2, t):
@@ -50,16 +49,15 @@ class Box:
 
         # colors = [bgr_to_hex(pix) for pix in sample]
         # sample = np.apply_along_axis(bgr_to_hsv, 1, sample)
-        # fig = plt.figure()
-        # ax = fig.add_subplot(211, projection='3d')
-        # img_ax = fig.add_subplot(212)
-        # img_ax.imshow(self.i)
-        # img_ax.set_title(self.t)
+        fig = plt.figure()
+        img_ax = fig.add_subplot(212)
+        img_ax.imshow(self.i)
+        img_ax.set_title(self.t)
         # ax.scatter(*sample.T, c=colors)
         # ax.set_xlabel('v')
         # ax.set_ylabel('s')
         # ax.set_zlabel('h')
-        # plt.show()
+        plt.show()
         # print(sample)
 
         fgs = []
@@ -202,11 +200,12 @@ def main_annotate(img, boxes):
     p_boxes = filter_boxes_with(p_boxes, Filters.away_from_border, img=img, label='edgy')
 
 
-    # draw_boxes(img, boxes, '#007700', 'correct')
+    draw_boxes(img, boxes, '#007700', 'correct')
 
-    fig, ax = plt.subplots()
-    ax.hist([b.est_font_size for b in boxes], bins=100)
-    plt.show()
+    # # show distribution of heights
+    # fig, ax = plt.subplots()
+    # ax.hist([b.est_font_size for b in boxes], bins=100)
+    # plt.show()
 
     cv2.imshow('pictoor', img)
     cv2.waitKey(0)
