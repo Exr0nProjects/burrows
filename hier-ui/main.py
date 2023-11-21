@@ -28,6 +28,7 @@ def parse_args():
 
 def main():
     image = parse_args()
+    print(image.shape)
     ocr_data: pd.DataFrame = pytesseract.image_to_data(image, output_type=pytesseract.Output.DATAFRAME)
     # ocr_data = ocr_data[ocr_data['conf'] > 0]
 
@@ -37,7 +38,7 @@ def main():
     #   find repeated spatial structures?
 
     # print(ocr_data)
-    print_lines(ocr_data)
+    # print_lines(ocr_data)
     annotate_image(image, ocr_data)
 
 def print_lines(ocr_data):
@@ -80,7 +81,6 @@ def annotate_image(img, ocr_data):
 
     i probably need to detect the main body and then re-run on just that
     """
-    print(hex_to_rgb('#326ccc'))
     for i, (level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text) in ocr_data.iterrows():
         start_point =(left, top)
         end_point =(left + width, top + height)
@@ -97,7 +97,6 @@ def annotate_image(img, ocr_data):
     cv2.imshow('annotated', annotated)
     cv2.waitKey(0)
     cv2.imwrite('./examples/' + 'woof.png', annotated)
-
 
 
 if __name__ == '__main__':

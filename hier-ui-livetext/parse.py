@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 
 from util import *
 import perspective_kit
+import tesseract_helper
 
 import random
 
@@ -26,13 +27,17 @@ class Box:
     t: str
     i: np.ndarray
     im_dims: Tuple[int, int]
+    _font_size: float
 
     @classmethod
     def from_pt(cls, img, p, t):
         points = np.array([coordify(img, pt) for pt in p], dtype='float32')
-        im_slice_squarified = perspective_kit.four_point_transform(img, points)
 
-        return Box(p, t, im_slice_squarified, img.shape[:2])
+        # im_slice_squarified = perspective_kit.four_point_transform(img, points)
+        # return Box(p, t, im_slice_squarified, img.shape[:2], 0)
+
+        tightened_img_rectified, tighter_coords, font_size = perspective_kit.warp_and_tessaract_correct(img, points)
+        return Box(tighter_coords, t, tightened_img_rectified, img.shape[:2], font_size)
 
     @classmethod
     def from_corners(cls, img: np.ndarray, p1, p2, t):
