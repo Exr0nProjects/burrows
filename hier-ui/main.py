@@ -38,7 +38,7 @@ def main():
     #   find repeated spatial structures?
 
     # print(ocr_data)
-    # print_lines(ocr_data)
+    print_lines(ocr_data)
     annotate_image(image, ocr_data)
 
 def print_lines(ocr_data):
@@ -91,8 +91,8 @@ def annotate_image(img, ocr_data):
         if level == 4:  # annotate lines
             cv2.rectangle(annotated, start_point, end_point, hex_to_rgb('#326ccc'), thickness=1, lineType=cv2.LINE_8)
 
-        if level == 2:
-            cv2.rectangle(annotated, start_point, end_point, (0, 200, 0), thickness=1, lineType=cv2.LINE_8)
+        # if level == 2:  # annotate blocks
+        #     cv2.rectangle(annotated, start_point, end_point, (0, 200, 0), thickness=1, lineType=cv2.LINE_8)
 
     cv2.imshow('annotated', annotated)
     cv2.waitKey(0)

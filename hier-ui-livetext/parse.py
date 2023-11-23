@@ -164,7 +164,7 @@ def draw_boxes(img, boxes, colors, labels=None):
         # for i1, i2 in [(0, 1), (2, 3)]: # just draw the x ones
         #     cv2.line(img, cify(box.p[i1]), cify(box.p[i2]), hex_to_rgb('#00ff00'), thickness, lineType=cv2.LINE_AA)
 
-        cv2.putText(img, f"{i}", cify(box.p[2]), font, 0.02 * abs(cify(box.p[0])[1] - cify(box.p[2])[1]), color, 3, lineType)
+        # cv2.putText(img, f"{i}", cify(box.p[2]), font, 0.02 * abs(cify(box.p[0])[1] - cify(box.p[2])[1]), color, 3, lineType)
 
 def filter_boxes_with(boxes, *filters, img: np.ndarray=None, color: str=None, label: str=None) -> List[Box]:
     mask = np.all([f(boxes) for f in filters], axis=0)
@@ -195,6 +195,15 @@ def main_annotate(img, boxes: List[Box]):
             para_texts.append("")
             final_str += '\n'
 
+
+        if prev is not None:
+            print('tl', box.tl, 'tr', box.tr, 'bl', box.bl, 'br', box.br, '\n\n\n')
+            # if abs(prev.bl[1] - box.tl[1]) > 0.8 * abs(box.tl[1]-box.bl[1]):  # line spacing
+            if min(prev.bl[1], prev.br[1]) < max(prev.tl[1], prev.tr[1]):
+                final_str += '\n'
+            else:
+                final_str += ' '
+
         if box.est_font_size > 60:
             final_str += '# '
         elif box.est_font_size > 30:
@@ -203,8 +212,7 @@ def main_annotate(img, boxes: List[Box]):
             final_str += '### '
         # elif box.est_font_size > 12:
         #     final_str += '#### '
-        final_str += box.t
-        if not box.t.endswith('\n'): final_str += '\n'
+        final_str += box.t.strip()
 
         paragraphs[-1].append(box)
         para_texts[-1] += ' ' + box.t
@@ -218,11 +226,11 @@ def main_annotate(img, boxes: List[Box]):
     plt.show()
 
 
-    draw_boxes(img, boxes, '#007700', 'correct')
-    cv2.imshow('pictoor', img)
-    cv2.waitKey(0)
+    # draw_boxes(img, boxes, '#007700', 'correct')
+    # cv2.imshow('pictoor', img)
+    # cv2.waitKey(0)
 
-    return
+    # return
 
     def calc_bounds(boxes):
         flatten = lambda ll: [x for y in ll for x in y]
@@ -235,10 +243,11 @@ def main_annotate(img, boxes: List[Box]):
 
 
     ### remove things on the edge
-    p_boxes = filter_boxes_with(p_boxes, Filters.away_from_border, img=img, label='edgy')
+    # p_boxes = filter_boxes_with(p_boxes, Filters.away_from_border, img=img, label='edgy')
+    p_boxes = filter_boxes_with(p_boxes, Filters.away_from_border)
 
 
-    draw_boxes(img, boxes, '#007700', 'correct')
+    # draw_boxes(img, boxes, '#007700', 'correct')
 
     # # show distribution of heights
     # fig, ax = plt.subplots()
